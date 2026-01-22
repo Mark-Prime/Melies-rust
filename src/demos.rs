@@ -17,6 +17,7 @@ use tf_demo_parser::demo::header::Header;
 use tf_demo_parser::{ Demo, DemoParser };
 
 use crate::demos::new_analyser::Class;
+use crate::settings;
 
 use self::new_analyser::Death;
 use self::new_analyser::Spawn;
@@ -393,8 +394,6 @@ pub fn scan_demo(settings: Value, path: String) -> Value {
     file_path = format!("{}{}", settings["tf_folder"].as_str().unwrap(), path);
   }
 
-  println!("Demo Path: {}", file_path);
-
   let file = fs::read(file_path).unwrap();
 
   let demo = Demo::new(&file);
@@ -698,4 +697,65 @@ pub fn cleanup_renamed_events(demo_map: Value, events: Vec<Value>) -> Value {
   }
 
   json!(demos)
+}
+
+fn get_demo_res(demo: &str) -> Value {
+  let file_path = format!("{}", demo);
+  
+  let settings = settings::load_settings();
+
+  scan_demo(settings, file_path)
+}
+
+fn output_info(info: Value, output: &str) -> Value {
+  println!("OUTPUT: {}", output);
+
+  if output == "" { 
+    println!("{}", serde_json::to_string_pretty(&info).unwrap());
+    return Value::from(info);
+  }
+
+  let file = fs::File::create(output).unwrap();
+
+  let writer = std::io::BufWriter::new(file);
+  serde_json::to_writer_pretty(writer, &info).unwrap();
+
+  Value::from(info)
+}
+
+pub fn get_info(demo: &str, output: &str) -> Value {
+  let res = get_demo_res(demo);
+  
+  let new_res = json!({
+    "header": res["header"],
+    "data": {
+      "players": res["data"]["users"],
+      "player_lives": res["data"]["player_lives"],
+      "chat": res["data"]["chat"],
+    }
+  });
+
+  output_info(new_res, output)
+}
+
+pub fn get_players(demo: &str, output: &str) -> Value {
+  let res = get_demo_res(demo);
+  
+  let new_res = json!({
+    "header": res["header"],
+    "data": res["data"]["users"]
+  });
+
+  output_info(new_res, output)
+}
+
+pub fn get_chat(demo: &str, output: &str) -> Value {
+  let res = get_demo_res(demo);
+  
+  let new_res = json!({
+    "header": res["header"],
+    "data": res["data"]["chat"]
+  });
+
+  output_info(new_res, output)
 }
