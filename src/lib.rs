@@ -15,23 +15,23 @@ use crate::vdms::*;
 use crate::ryukbot::run_ryukbot;
 use crate::util::*;
 
-mod addons;
-mod clip;
-mod demos;
-mod event;
-mod logstf;
-mod macros;
-mod settings;
-mod vdms;
-mod tf2;
-mod rgl;
-mod weapons;
-mod batch_automation;
-mod ryukbot;
-mod util;
-mod cfg;
-mod events;
-mod command;
+pub mod addons;
+pub mod clip;
+pub mod demos;
+pub mod event;
+pub mod logstf;
+pub mod macros;
+pub mod settings;
+pub mod vdms;
+pub mod tf2;
+pub mod rgl;
+pub mod weapons;
+pub mod batch_automation;
+pub mod ryukbot;
+pub mod util;
+pub mod cfg;
+pub mod events;
+pub mod command;
 
 fn ryukbot() -> Value {
   run_ryukbot()
