@@ -121,7 +121,7 @@ fn build_launch_options(
   return launch_options;
 }
 
-pub(crate) fn run_tf2(
+pub fn run_tf2(
   demo_name: &str,
   settings: &Value,
   tab: &str
@@ -342,7 +342,7 @@ fn load_vdm(tf_folder: &str, demo_name: &str) -> Option<VDM> {
   return Some(vdm);
 }
 
-pub(crate) fn get_next_demo(settings: &Value, demo_name: &str) -> Value {
+pub fn get_next_demo(settings: &Value, demo_name: &str) -> Value {
   use vdm::VDM;
 
   let output_folder = settings["output"]["folder"].as_str().unwrap();

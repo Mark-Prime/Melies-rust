@@ -3,7 +3,7 @@ use std::path::Path;
 use serde_json::{ json, Value };
 use vdm::{ action::{ Action, ActionType }, VDM };
 
-pub(crate) fn json_to_vdm(json: Value) -> VDM {
+pub fn json_to_vdm(json: Value) -> VDM {
   let mut vdm = VDM::new();
 
   for action in json.as_array().unwrap() {
@@ -216,7 +216,7 @@ pub(crate) fn json_to_vdm(json: Value) -> VDM {
   vdm
 }
 
-pub(crate) fn vdm_to_json(vdm: VDM) -> Value {
+pub fn vdm_to_json(vdm: VDM) -> Value {
   let mut actions: Vec<Value> = vec![];
 
   for action in vdm.actions {
@@ -366,7 +366,7 @@ pub(crate) fn vdm_to_json(vdm: VDM) -> Value {
   json!(actions)
 }
 
-pub(crate) fn cleanup_renamed_vdms(demo_map: Value, vdms: Value, tf_path: &str) {
+pub fn cleanup_renamed_vdms(demo_map: Value, vdms: Value, tf_path: &str) {
   for vdm in vdms["vdms"].as_array().unwrap() {
     let demo_name = format!("{}", vdm["name"].as_str().unwrap());
 

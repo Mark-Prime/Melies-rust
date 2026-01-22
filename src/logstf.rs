@@ -2,7 +2,7 @@ use reqwest;
 use serde_json::{ self, json, Value };
 use steamid_ng::SteamID;
 
-pub(crate) fn parse(url: Value) -> Value {
+pub fn parse(url: Value) -> Value {
   let log_id = url.as_str().unwrap();
   println!("Logs.tf url: https://logs.tf/json/{}", log_id);
   let res = reqwest::blocking::get(format!("https://logs.tf/json/{}", log_id));

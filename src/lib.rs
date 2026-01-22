@@ -12,7 +12,6 @@ use trash;
 use crate::demos::*;
 use crate::logstf::parse;
 use crate::vdms::*;
-use crate::ryukbot::run_ryukbot;
 use crate::util::*;
 
 pub mod addons;
@@ -33,19 +32,11 @@ pub mod cfg;
 pub mod events;
 pub mod command;
 
-fn ryukbot() -> Value {
-  run_ryukbot()
-}
-
 fn load_settings() -> Value {
   settings::load_settings()
 }
 
-fn save_settings(new_settings: String) -> Value {
-  settings::save_settings(new_settings)
-}
-
-fn load_events() -> Value {
+pub fn load_events() -> Value {
   let settings = load_settings();
 
   let dir;
@@ -99,11 +90,11 @@ fn save_events(new_events: Value) -> Value {
   crate::events::save_events(new_events)
 }
 
-fn parse_log(url: Value) -> Value {
+pub fn parse_log(url: Value) -> Value {
   parse(url)
 }
 
-fn load_vdms() -> Result<Value, String> {
+pub fn load_vdms() -> Result<Value, String> {
   let settings = load_settings();
   if validate_demos_folder(&settings) {
     return Ok(scan_for_vdms(settings));
@@ -112,7 +103,7 @@ fn load_vdms() -> Result<Value, String> {
   Err(String::from("Can't find \\tf folder. Please fix the \"\\tf Folder\" setting in settings."))
 }
 
-fn load_demos() -> Result<Value, String> {
+pub fn load_demos() -> Result<Value, String> {
   let settings = load_settings();
   if validate_demos_folder(&settings) {
     return Ok(scan_for_demos(settings));
@@ -121,7 +112,7 @@ fn load_demos() -> Result<Value, String> {
   Err(String::from("Can't find \\tf folder. Please fix the \"\\tf Folder\" setting in settings."))
 }
 
-pub(crate) fn validate_backups_folder() -> bool {
+pub fn validate_backups_folder() -> bool {
   let user_profile = env::var("USERPROFILE");
 
   let backups_folder = match user_profile {
@@ -141,7 +132,7 @@ pub(crate) fn validate_backups_folder() -> bool {
   }
 }
 
-pub(crate) fn scan_for_backups() -> Value {
+pub fn scan_for_backups() -> Value {
   let mut events: Vec<Value> = vec![];
 
   let user_profile = env::var("USERPROFILE");
@@ -170,7 +161,7 @@ pub(crate) fn scan_for_backups() -> Value {
   json!(events)
 }
 
-fn load_backups() -> Result<Value, String> {
+pub fn load_backups() -> Result<Value, String> {
   if validate_backups_folder() {
     return Ok(scan_for_backups());
   }
@@ -178,7 +169,7 @@ fn load_backups() -> Result<Value, String> {
   Err(String::from("Can't find backups folder. You may not have backups yet."))
 }
 
-fn reload_backup(file_name: Value) -> Result<Value, String> {
+pub fn reload_backup(file_name: Value) -> Result<Value, String> {
   let user_profile = env::var("USERPROFILE");
 
   let backups_folder = match user_profile {
@@ -219,11 +210,11 @@ fn reload_backup(file_name: Value) -> Result<Value, String> {
   Err(String::from("Failed to find backup file."))
 }
 
-fn parse_demo(path: String) -> Value {
+pub fn parse_demo(path: String) -> Value {
   scan_demo(load_settings(), path)
 }
 
-fn load_vdm(name: Value) -> Value {
+pub fn load_vdm(name: Value) -> Value {
   let settings = load_settings();
 
   let dir = format!("{}{}", settings["tf_folder"].as_str().unwrap(), name.as_str().unwrap());
@@ -233,7 +224,7 @@ fn load_vdm(name: Value) -> Value {
   vdm_to_json(vdm)
 }
 
-fn save_vdm(name: Value, vdm: Value) -> Value {
+pub fn save_vdm(name: Value, vdm: Value) -> Value {
   let settings = load_settings();
 
   let dir = format!("{}{}", settings["tf_folder"].as_str().unwrap(), name.as_str().unwrap());
@@ -247,11 +238,7 @@ fn save_vdm(name: Value, vdm: Value) -> Value {
     })
 }
 
-fn open_addons_folder() {
-  addons::open_addons_folder();
-}
-
-fn delete_demo(file_name: Value) {
+pub fn delete_demo(file_name: Value) {
   let settings = load_settings();
 
   let file_path = format!(
@@ -277,7 +264,7 @@ fn delete_demo(file_name: Value) {
   }
 }
 
-fn delete_vdm(file_name: Value) {
+pub fn delete_vdm(file_name: Value) {
   let settings = load_settings();
 
   let file_path = format!(
@@ -293,7 +280,7 @@ fn delete_vdm(file_name: Value) {
   }
 }
 
-fn create_vdm(file_name: Value) {
+pub fn create_vdm(file_name: Value) {
   let settings = load_settings();
 
   let file_path = format!(
@@ -310,7 +297,7 @@ fn create_vdm(file_name: Value) {
   }
 }
 
-fn load_theme() -> Value {
+pub fn load_theme() -> Value {
   let user_profile = env::var("USERPROFILE");
 
   let settings_path = match user_profile {
@@ -337,7 +324,7 @@ fn load_theme() -> Value {
     });
 }
 
-fn open_themes_folder() {
+pub fn open_themes_folder() {
   let user_profile = env::var("USERPROFILE");
 
   let addons_path = match user_profile {
@@ -352,7 +339,7 @@ fn open_themes_folder() {
   Command::new("explorer").arg(addons_path).spawn().unwrap();
 }
 
-fn open_install_folder(install: &str) {
+pub fn open_install_folder(install: &str) {
   let settings = load_settings();
   let tf_folder = settings["tf_folder"].as_str().unwrap();
   let tf_parent = PathBuf::from(tf_folder).parent().unwrap().to_path_buf();
@@ -366,7 +353,7 @@ fn open_install_folder(install: &str) {
   Command::new("explorer").arg(install_folder).spawn().unwrap();
 }
 
-fn rename_file(old_path: &str, new_path: &str) {
+pub fn rename_file(old_path: &str, new_path: &str) {
   let path = Path::new(old_path);
   let new_path = Path::new(new_path);
 
@@ -375,7 +362,7 @@ fn rename_file(old_path: &str, new_path: &str) {
   fs::rename(path, sanitized_path).unwrap();
 }
 
-fn cleanup_rename(demo_map: Value) {
+pub fn cleanup_rename(demo_map: Value) {
   let events_obj = load_events();
 
   let events = match events_obj["events"].as_array() {
@@ -395,7 +382,7 @@ fn cleanup_rename(demo_map: Value) {
   );
 }
 
-fn sanitize_name(path: &Path) -> PathBuf {
+pub fn sanitize_name(path: &Path) -> PathBuf {
   let mut result = path.to_owned();
 
   let file_name = path.file_name().unwrap().to_str().unwrap();
@@ -410,7 +397,7 @@ fn sanitize_name(path: &Path) -> PathBuf {
   result
 }
 
-fn is_steam_running() -> bool {
+pub fn is_steam_running() -> bool {
   use sysinfo::System;
 
   let s = System::new_all();
@@ -425,19 +412,7 @@ fn is_steam_running() -> bool {
   process_found
 }
 
-fn launch_tf2(demo_name: &str, tab: &str) -> Value {
-  tf2::run_tf2(demo_name, &load_settings(), tab)
-}
-
-fn get_next_demo(demo_name: &str) -> Value {
-  tf2::get_next_demo(&load_settings(), demo_name)
-}
-
-fn is_tf2_running() -> Value {
-  serde_json::Value::Bool(tf2::is_tf2_running())
-}
-
-fn load_files(folder: &str) -> Value {
+pub fn load_files(folder: &str) -> Value {
   let path = std::path::Path::new(folder);
   if !path.exists() {
     return json!({});
@@ -492,32 +467,4 @@ fn load_files(folder: &str) -> Value {
   }
 
   json!(videos)
-}
-
-fn open_file(path: &str) {
-  opener::open(path).unwrap();
-}
-
-fn delete_file(path: &str) {
-  trash::delete(path).unwrap();
-}
-
-fn build_install(folder_name: &str) -> Value {
-  tf2::build_new_install(folder_name, &load_settings())
-}
-
-fn get_weapons() -> Value {
-  weapons::get_weapons_as_json()
-}
-
-fn before_batch() -> Value {
-  batch_automation::before_batch(&load_settings())
-}
-
-fn after_batch() -> Value {
-  batch_automation::after_batch(&load_settings())
-}
-
-fn get_rgl_users(steam_ids: Vec<String>) -> Value {
-  rgl::get_users(steam_ids)
 }

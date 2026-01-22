@@ -145,7 +145,7 @@ impl Life {
   }
 }
 
-pub(crate) fn validate_demos_folder(settings: &Value) -> bool {
+pub fn validate_demos_folder(settings: &Value) -> bool {
   let tf_folder = settings["tf_folder"].as_str();
   if tf_folder.is_none() {
     return false;
@@ -161,7 +161,7 @@ pub(crate) fn validate_demos_folder(settings: &Value) -> bool {
   }
 }
 
-pub(crate) fn scan_for_demos(settings: Value) -> Value {
+pub fn scan_for_demos(settings: Value) -> Value {
   let mut demos: Vec<Value> = vec![];
 
   if !Path::new(settings["tf_folder"].as_str().unwrap()).exists() {
@@ -333,7 +333,7 @@ fn scan_folder_for_filetype(settings: &Value, path: &str, file_type: &str) -> Ve
   files
 }
 
-pub(crate) fn scan_for_vdms(settings: Value) -> Value {
+pub fn scan_for_vdms(settings: Value) -> Value {
   let mut vdms: Vec<Value> = vec![];
 
   if !Path::new(settings["tf_folder"].as_str().unwrap()).exists() {
@@ -386,7 +386,7 @@ fn get_player_class(
   Class::Other
 }
 
-pub(crate) fn scan_demo(settings: Value, path: String) -> Value {
+pub fn scan_demo(settings: Value, path: String) -> Value {
   let mut file_path = path.clone();
 
   if path.starts_with("\\") {
@@ -665,7 +665,7 @@ pub(crate) fn scan_demo(settings: Value, path: String) -> Value {
   Value::from(resp)
 }
 
-pub(crate) fn cleanup_renamed_events(demo_map: Value, events: Vec<Value>) -> Value {
+pub fn cleanup_renamed_events(demo_map: Value, events: Vec<Value>) -> Value {
   let mut demos = vec![];
   let mut current_demo = vec![];
   let mut current_demo_name = String::new();

@@ -190,7 +190,7 @@ pub(crate) fn default_settings() -> Value {
   defaults
 }
 
-pub(crate) fn load_settings() -> Value {
+pub fn load_settings() -> Value {
   let user_profile = env::var("USERPROFILE");
 
   let settings_path = match user_profile {
@@ -224,7 +224,7 @@ pub(crate) fn load_settings() -> Value {
   build_settings()
 }
 
-pub(crate) fn save_settings(new_settings: String) -> Value {
+pub fn save_settings(new_settings: String) -> Value {
   let settings: Value = serde_json::from_str(&new_settings).unwrap();
 
   let user_profile = env::var("USERPROFILE");
