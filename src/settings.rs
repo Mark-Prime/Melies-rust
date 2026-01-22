@@ -131,7 +131,8 @@ pub(crate) fn default_settings() -> Value {
         "before_batch": "nothing",
         "before_batch_path": "",
         "after_batch": "nothing",
-        "after_batch_path": ""
+        "after_batch_path": "",
+        "inject_hlae": false
       },
       "features": {
         "basic": {

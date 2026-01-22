@@ -22,6 +22,19 @@ fn use_64bit(settings: &Value, tab: i64) -> bool {
 
   return use_64bit;
 }
+fn inject_hlae(settings: &Value, tab: i64) -> bool {
+  let mut inject_hlae = settings["hlae"]["inject_hlae"].as_bool().unwrap();
+
+  if tab > 0 {
+    let alt_install = settings["alt_installs"][(tab - 1) as usize].clone();
+
+    if alt_install["inject_hlae"].as_bool().is_some() {
+      inject_hlae = alt_install["inject_hlae"].as_bool().unwrap();
+    }
+  }
+
+  return inject_hlae;
+}
 
 fn get_tf2_path(settings: &Value, tab: i64) -> PathBuf {
   let mut tf2_path = PathBuf::from(settings["tf_folder"].as_str().unwrap())
@@ -135,24 +148,23 @@ pub fn run_tf2(
   let tab = tab.parse::<i64>().unwrap();
   
   let tf2_path = get_tf2_path(settings, tab);
-  let use_64bit = use_64bit(settings, tab);
-
-  let sparkly_path = settings["hlae"]["sparklyfx_path"].as_str().unwrap();
-
-  let sparkly_path = match use_64bit {
-    true =>
-      sparkly_path
-        .replace("xsdk-base.dll", "xsdk-base64.dll"),
-    false =>
-      sparkly_path
-        .replace("xsdk-base64.dll", "xsdk-base.dll"),
-  };
-
-  let hlae = settings["hlae"]["hlae_path"].as_str().unwrap();
-  let hlae_dll = hlae.to_owned().replace("HLAE.exe", "AfxHookSource.dll");
 
   match settings["output"]["method"].as_str().unwrap() {
     "sparklyfx" => {
+      let use_64bit = use_64bit(settings, tab);
+      let inject_hlae = inject_hlae(settings, tab);
+
+      let sparkly_path = settings["hlae"]["sparklyfx_path"].as_str().unwrap();
+
+      let sparkly_path = match use_64bit {
+        true =>
+          sparkly_path
+            .replace("xsdk-base.dll", "xsdk-base64.dll"),
+        false =>
+          sparkly_path
+            .replace("xsdk-base64.dll", "xsdk-base.dll"),
+      };
+
       let mut args = vec![
         "-customLoader",
         "-noGui",
@@ -165,10 +177,22 @@ pub fn run_tf2(
         launch_options.as_str()
       ];
 
-      if !use_64bit && Path::new(&hlae_dll).exists() {
+      let hlae = settings["hlae"]["hlae_path"].as_str().unwrap();
+      let mut hlae_dll = hlae.to_owned().replace("HLAE.exe", "AfxHookSource.dll");
+
+      if use_64bit == true {
+        hlae_dll = hlae_dll.replace("AfxHookSource.dll", "x64\\AfxHookSource.dll");
+      }
+
+      println!("HLAE path: {}", hlae_dll);
+      println!("inject_hlae: {}", inject_hlae);
+
+      if inject_hlae && Path::new(&hlae_dll).exists() {
         args.push("-hookDllPath");
         args.push(&hlae_dll);
       }
+
+      println!("Args: {:#?}", args);
 
       let hlae_cmd = Command::new(hlae).args(args).spawn();
 
