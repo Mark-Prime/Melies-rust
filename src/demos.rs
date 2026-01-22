@@ -708,8 +708,6 @@ fn get_demo_res(demo: &str) -> Value {
 }
 
 fn output_info(info: Value, output: &str) -> Value {
-  println!("OUTPUT: {}", output);
-
   if output == "" { 
     println!("{}", serde_json::to_string_pretty(&info).unwrap());
     return Value::from(info);
