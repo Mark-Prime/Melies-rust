@@ -192,6 +192,18 @@ pub fn run_tf2(
         args.push(&hlae_dll);
       }
 
+      let mut addictional_dlls = settings["hlae"]["additional_dlls"].as_array().unwrap();
+
+      if settings["alt_installs"][tab.to_string()].is_object() && settings["alt_installs"][tab.to_string()]["additional_dlls"].is_array() && settings["alt_installs"][tab.to_string()]["additional_dlls"].as_array().unwrap().len() > 0 {
+        addictional_dlls = settings["alt_installs"][tab.to_string()]["additional_dlls"].as_array().unwrap();
+      }
+
+      for dll in addictional_dlls {
+        let dll = dll.as_str().unwrap();
+        args.push("-hookDllPath");
+        args.push(dll);
+      }
+
       println!("Args: {:#?}", args);
 
       let hlae_cmd = Command::new(hlae).args(args).spawn();
