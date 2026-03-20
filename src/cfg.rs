@@ -40,6 +40,11 @@ pub fn write_cfg(settings: &Value) -> Result<(), String> {
 
   extend!(cfg, "{};\n", "alias \"snd_fix\" \"snd_restart; snd_soundmixer Default_mix;\"");
 
+  if setting_as_bin(&settings["features"]["demo_scanner"]["rgl_force_rename"]) == 1 {
+    extend!(cfg, "{}\n", "ce_playeraliases_enabled 1;");
+    extend!(cfg, "{}\n", "exec mls_rgl_aliases;");
+  }
+
   extend!(cfg, "{}", compile_addons(settings));
 
   let tf_folder = match settings["tf_folder"].as_str() {

@@ -132,7 +132,8 @@ pub(crate) fn default_settings() -> Value {
         "before_batch_path": "",
         "after_batch": "nothing",
         "after_batch_path": "",
-        "inject_hlae": false
+        "inject_hlae": false,
+        "additional_dlls": []
       },
       "features": {
         "basic": {
@@ -148,6 +149,7 @@ pub(crate) fn default_settings() -> Value {
         "demo_scanner": {
             "logstf": false,
             "rgl": false,
+            "rgl_force_rename": false,
             "med_picks": true,
             "airshots": true,
             "killstreaks": true,
