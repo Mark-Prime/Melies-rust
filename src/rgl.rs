@@ -33,6 +33,12 @@ pub fn get_users(steam_ids: Vec<String>) -> Value {
   for user in response.as_array().unwrap() {
     let steam_id = user["steamId"].as_str().unwrap();
     users[steam_id] = user.clone();
+
+    // The RGL website wont let me add () to my name
+    // Drastic times call for drastic measures
+    if steam_id == "76561198045517514" {
+      users[steam_id]["name"] = serde_json::Value::String("Maven (famous)".to_string());
+    }
   }
 
   users
