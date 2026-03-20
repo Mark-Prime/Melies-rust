@@ -5,6 +5,7 @@ use tf_demo_parser::demo::gameevent_gen::{
   PlayerDeathEvent,
   PlayerSpawnEvent,
   TeamPlayRoundWinEvent,
+  TeamPlayPointCapturedEvent
 };
 use tf_demo_parser::demo::message::packetentities::{ EntityId, PacketEntitiesMessage };
 use tf_demo_parser::demo::message::usermessage::{ ChatMessageKind, SayText2Message, UserMessage };
@@ -12,6 +13,7 @@ use tf_demo_parser::demo::message::{ Message, MessageType };
 use tf_demo_parser::demo::packet::stringtable::StringTableEntry;
 use tf_demo_parser::demo::parser::gamestateanalyser::UserId;
 use tf_demo_parser::demo::parser::handler::{ BorrowMessageHandler, MessageHandler };
+// use tf_demo_parser::demo::parser::state;
 // use tf_demo_parser::demo::vector::Vector;
 use tf_demo_parser::{ ParserState, ReadResult, Stream };
 // use bitbuffer::{BitWrite, BitWriteStream, Endianness};
@@ -49,6 +51,46 @@ impl ChatMessage {
       // message: message.clone()
     }
   }
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct  Capture {
+    pub cp: u8,
+    pub cp_name: String,
+    pub team: Team,
+    pub cappers: vec::Vec<EntityId>,
+    pub cappers_users: vec::Vec<UserId>,
+    pub tick: DemoTick
+}
+
+impl Capture {
+    pub fn from_event(event: &TeamPlayPointCapturedEvent, tick: DemoTick, state: &MatchState) -> Self {
+      let mut cappers = vec::Vec::new();
+      let mut cappers_users = vec::Vec::new();
+      let cappers_text = event.cappers.to_string(); //"\u{2}\u{5}\u{f}"
+      let cappers_split = cappers_text.chars().collect::<Vec<char>>();
+
+      for i in 0..cappers_split.len() {
+        if ['\r', '\n', '\t', ' '].contains(&cappers_split[i]) {
+          continue;
+        }
+
+        let cap_u32 = cappers_split[i] as u32;
+
+        cappers.push(EntityId::from(cap_u32));
+        cappers_users.push(state.id_map.get(&EntityId::from(cap_u32)).unwrap().to_owned().into());
+      }
+
+      Capture {
+        cp: event.cp,
+        cp_name: event.cp_name.to_string(),
+        team: Team::new(event.team),
+        cappers,
+        cappers_users,
+        tick
+      }
+    }
 }
 
 #[derive(
@@ -519,6 +561,9 @@ impl Analyser {
       GameEvent::PlayerChargeDeployed(event) => {
         self.state.ubers.push(Uber::from_event(event, tick));
       }
+      GameEvent::TeamPlayPointCaptured(event) => {
+        self.state.captures.push(Capture::from_event(event, tick, &self.state));
+      }
       _ => {}
     }
   }
@@ -638,5 +683,6 @@ pub struct MatchState {
   pub interval_per_tick: f32,
   pub pauses: Vec<Pause>,
   pub ubers: Vec<Uber>,
-  id_map: HashMap<EntityId, UserId>,
+  pub captures: Vec<Capture>,
+  pub id_map: HashMap<EntityId, UserId>,
 }

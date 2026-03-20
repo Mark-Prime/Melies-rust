@@ -33,6 +33,8 @@ enum Event {
   Kill(Death),
   Assist(Death),
   RoundEnd(u32),
+  Uber(UberPointer),
+  Capture(CapturePointer)
 }
 
 impl Event {
@@ -52,6 +54,12 @@ impl Event {
       }
       Event::RoundEnd(val) => {
         return val.to_owned();
+      }
+      Event::Uber(val) => {
+        return val.tick.into();
+      }
+      Event::Capture(val) => {
+        return val.tick.into();
       }
     }
   }
@@ -116,6 +124,18 @@ impl KillPointer {
 }
 
 #[derive(Debug, Serialize, Clone)]
+struct UberPointer {
+  pub uber_index: u16,
+  pub tick: DemoTick,
+}
+
+#[derive(Debug, Serialize, Clone)]
+struct CapturePointer {
+  pub capture_index: u16,
+  pub tick: DemoTick,
+}
+
+#[derive(Debug, Serialize, Clone)]
 struct Life {
   pub start: Option<u32>,
   pub end: Option<u32>,
@@ -126,6 +146,8 @@ struct Life {
   pub kills: Vec<Death>,
   pub assists: Vec<Death>,
   pub classes: Vec<String>,
+  pub ubers: Vec<UberPointer>,
+  pub captures: Vec<CapturePointer>,
   pub finalized: bool,
 }
 
@@ -141,6 +163,8 @@ impl Life {
       kills: vec![],
       assists: vec![],
       classes,
+      ubers: vec![],
+      captures: vec![],
       finalized: false,
     }
   }
@@ -420,6 +444,11 @@ pub fn scan_demo(settings: Value, path: String) -> Value {
 
   organizer::get_rounds(&mut state, &mut user_events, &header);
 
+  organizer::get_ubers(&mut state, &mut user_events);
+
+  organizer::get_captures(&mut state, &mut user_events);
+
+
   let sorted_events: Arc<Mutex<HashMap<u16, Vec<Event>>>> = Arc::new(Mutex::new(HashMap::new()));
   let player_lives: Arc<Mutex<HashMap<u16, Vec<Life>>>> = Arc::new(Mutex::new(HashMap::new()));
   let killstreak_pointers: Arc<Mutex<Vec<KillstreakPointer>>> = Arc::new(Mutex::new(vec![]));
@@ -453,99 +482,123 @@ pub fn scan_demo(settings: Value, path: String) -> Value {
 
       for event in &events {
         match event {
-          Event::Spawn(spawn) => {
-            if current_life.start == None || current_life.classes.len() == 0 {
-              current_life = Life::new(Some(spawn.tick.into()), vec![spawn.class.to_string()]);
-              continue;
-            }
-            
-            if !current_life.classes.contains(&spawn.class.to_string()) {
-              current_life.classes.push(spawn.class.to_string());
-            }
-          }
-          Event::Kill(kill) => {
-            if kill.killer == kill.victim {
-              continue;
-            }
-
-            if current_life.start == None || current_life.classes.len() == 0 {
-              current_life = match current_player.pop() {
-                Some(val) => val,
-                None => {
+            Event::Spawn(spawn) => {
+                if current_life.start == None || current_life.classes.len() == 0 {
+                  current_life = Life::new(Some(spawn.tick.into()), vec![spawn.class.to_string()]);
                   continue;
                 }
-              };
-            }
-
-            // println!("{:?}", kill);
-            if kill.victim_class == Class::Medic {
-              let med_pick = KillPointer::new(key, current_player.len(), current_life.kills.len());
-              current_life.med_picks.push(med_pick.clone());
-              med_picks.lock().unwrap().push(med_pick);
-            }
-
-            if kill.is_airborne {
-              let airshot = KillPointer::new(key, current_player.len(), current_life.kills.len());
-              current_life.airshots.push(airshot.clone());
-              airshots.lock().unwrap().push(airshot);
-            }
-
-            current_life.last_kill_tick = kill.tick;
-
-            current_life.kills.push(kill.to_owned());
-          }
-          Event::Assist(assist) => {
-            if current_life.start == None || current_life.classes.len() == 0 {
-              current_life = match current_player.pop() {
-                Some(val) => val,
-                None => {
+    
+                if !current_life.classes.contains(&spawn.class.to_string()) {
+                  current_life.classes.push(spawn.class.to_string());
+                }
+              }
+            Event::Kill(kill) => {
+                if kill.killer == kill.victim {
                   continue;
                 }
-              };
-            }
 
-            current_life.assists.push(assist.to_owned());
-          }
-          Event::Death(death) => {
-            // if death.killer == 0 {
-            //   continue;
-            // }
-
-            if current_life.start == None || current_life.classes.len() == 0 {
-              current_life = match current_player.pop() {
-                Some(val) => val,
-                None => {
-                  continue;
+                if current_life.start == None || current_life.classes.len() == 0 {
+                  current_life = match current_player.pop() {
+                    Some(val) => val,
+                    None => {
+                      continue;
+                    }
+                  };
                 }
-              };
-            }
 
-            current_life.end = Some(death.tick.into());
-
-            if !current_life.classes.contains(&"spy".to_string()) && current_life.classes.len() > 0 {
-              current_life.finalized = true;
-            }
-
-            current_player.push(current_life);
-
-            current_life = Life::new(None, vec!["".to_string()]);
-          }
-          Event::RoundEnd(tick) => {
-            if current_life.start == None || current_life.classes.len() == 0 {
-              current_life = match current_player.pop() {
-                Some(val) => val,
-                None => {
-                  continue;
+                // println!("{:?}", kill);
+                if kill.victim_class == Class::Medic {
+                  let med_pick = KillPointer::new(key, current_player.len(), current_life.kills.len());
+                  current_life.med_picks.push(med_pick.clone());
+                  med_picks.lock().unwrap().push(med_pick);
                 }
-              };
-            }
 
-            current_life.end = Some(tick.to_owned());
-            current_life.finalized = true;
-            current_player.push(current_life);
+                if kill.is_airborne {
+                  let airshot = KillPointer::new(key, current_player.len(), current_life.kills.len());
+                  current_life.airshots.push(airshot.clone());
+                  airshots.lock().unwrap().push(airshot);
+                }
 
-            current_life = Life::new(None, vec!["".to_string()]);
-          }
+                current_life.last_kill_tick = kill.tick;
+
+                current_life.kills.push(kill.to_owned());
+              }
+            Event::Assist(assist) => {
+                if current_life.start == None || current_life.classes.len() == 0 {
+                  current_life = match current_player.pop() {
+                    Some(val) => val,
+                    None => {
+                      continue;
+                    }
+                  };
+                }
+
+                current_life.assists.push(assist.to_owned());
+              }
+            Event::Death(death) => {
+                // if death.killer == 0 {
+                //   continue;
+                // }
+
+                if current_life.start == None || current_life.classes.len() == 0 {
+                  current_life = match current_player.pop() {
+                    Some(val) => val,
+                    None => {
+                      continue;
+                    }
+                  };
+                }
+
+                current_life.end = Some(death.tick.into());
+
+                if !current_life.classes.contains(&"spy".to_string()) && current_life.classes.len() > 0 {
+                  current_life.finalized = true;
+                }
+
+                current_player.push(current_life);
+
+                current_life = Life::new(None, vec!["".to_string()]);
+              }
+            Event::RoundEnd(tick) => {
+                if current_life.start == None || current_life.classes.len() == 0 {
+                  current_life = match current_player.pop() {
+                    Some(val) => val,
+                    None => {
+                      continue;
+                    }
+                  };
+                }
+
+                current_life.end = Some(tick.to_owned());
+                current_life.finalized = true;
+                current_player.push(current_life);
+
+                current_life = Life::new(None, vec!["".to_string()]);
+              }
+            Event::Uber(uber_pointer) => {
+              if current_life.start == None || current_life.classes.len() == 0 {
+                current_life = match current_player.pop() {
+                  Some(val) => val,
+                  None => {
+                    continue;
+                  }
+                };
+              }
+
+              current_life.ubers.push(uber_pointer.to_owned());
+            },
+            Event::Capture(capture_pointer) => {
+              if current_life.start == None || current_life.classes.len() == 0 {
+                current_life = match current_player.pop() {
+                  Some(val) => val,
+                  None => {
+                    continue;
+                  }
+                };
+              }
+
+              current_life.captures.push(capture_pointer.to_owned());
+            },
         }
       }
 
@@ -655,7 +708,8 @@ pub fn scan_demo(settings: Value, path: String) -> Value {
         "airshots": airshots,
         "killstreak_pointers": killstreak_pointers,
         "pauses": state.pauses,
-        "ubers": state.ubers
+        "ubers": state.ubers,
+        "captures": state.captures
       },
       "loaded": true,
       "loading": false

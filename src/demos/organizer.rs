@@ -5,7 +5,7 @@ use tf_demo_parser::demo::header::Header;
 
 use crate::demos::new_analyser::MatchState;
 
-use crate::demos::{ClassSpawn, Event, get_player_class};
+use crate::demos::{CapturePointer, ClassSpawn, Event, UberPointer, get_player_class};
 
 pub fn get_classes(state: &MatchState, user_events: &mut HashMap<u16, Vec<Event>>, user_classes: &mut HashMap<u16, Vec<ClassSpawn>>) {
   for spawn in &state.spawns {
@@ -64,6 +64,28 @@ pub fn get_rounds(state: &mut MatchState, user_events: &mut HashMap<u16, Vec<Eve
 
     if round.end_tick == DemoTick::from(0) {
       round.end_tick = DemoTick::from(header.ticks);
+    }
+  }
+}
+
+pub fn get_ubers(state: &mut MatchState, user_events: &mut HashMap<u16, Vec<Event>>) {
+  for (i, uber) in state.ubers.iter().enumerate() {
+    let user_id: u16 = uber.user_id.into();
+    let user = user_events.entry(user_id).or_insert(vec![]);
+    let pointer = UberPointer { uber_index: i as u16, tick: uber.tick };
+
+    user.push(Event::Uber(pointer));
+  }
+}
+
+pub fn get_captures(state: &mut MatchState, user_events: &mut HashMap<u16, Vec<Event>>) {
+  for (i, capture) in state.captures.iter().enumerate() {
+    for entity_id in capture.cappers.iter() {
+      let user_id = state.id_map.get(entity_id).unwrap().to_owned().into();
+      let entity = user_events.entry(user_id).or_insert(vec![]);
+      let pointer = CapturePointer { capture_index: i as u16, tick: capture.tick };
+
+      entity.push(Event::Capture(pointer));
     }
   }
 }
