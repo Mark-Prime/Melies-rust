@@ -7,7 +7,7 @@ use std::{
 };
 use fs_extra::{ copy_items, dir };
 use serde_json::{ json, Value };
-use vdm::VDM;
+use vdm::{VDM, action::Properties};
 
 fn use_64bit(settings: &Value, tab: i64) -> bool {
   let mut use_64bit = settings["hlae"]["use_64bit"].as_bool().unwrap();
@@ -54,10 +54,9 @@ fn get_tf2_path(settings: &Value, tab: i64) -> PathBuf {
 fn build_launch_options(
   settings: &Value,
   demo_name: &str,
-  tab: &str
+  tab: i64
 ) -> String {
   let mut launch_options = settings["hlae"]["launch_options"].to_string();
-  let tab = tab.parse::<i64>().unwrap();
   let use_64bit = use_64bit(settings, tab);
 
   if tab > 0 {
@@ -140,12 +139,11 @@ pub fn run_tf2(
   tab: &str
 ) -> Value {
   println!("Running TF2");
+  let tab = tab.parse::<i64>().unwrap();
 
   let launch_options = build_launch_options(settings, demo_name, tab);
 
   println!("Launch options: {}", launch_options);
-
-  let tab = tab.parse::<i64>().unwrap();
   
   let tf2_path = get_tf2_path(settings, tab);
 
@@ -378,9 +376,37 @@ fn load_vdm(tf_folder: &str, demo_name: &str) -> Option<VDM> {
   return Some(vdm);
 }
 
-pub fn get_next_demo(settings: &Value, demo_name: &str) -> Value {
-  use vdm::VDM;
+fn handle_load_vdm(props: Properties, tf_folder: &str, demo_name: &str, vdm_path: &str) -> Value {
+  if props.name.contains("mls_load_vdm") {
+    let new_vdm = props.name.replace("mls_load_vdm ", "");
 
+    let new_vdm_path = format!("{}\\{}.vdm", tf_folder, new_vdm);
+
+    let new_vdm = match VDM::open(&new_vdm_path) {
+      Ok(vdm) => vdm,
+      Err(e) => {
+        println!("Failed to open {}.vdm: {}", new_vdm, e);
+        return json!({
+          "complete": false,
+          "next_demo": demo_name
+        });
+      }
+    };
+
+    new_vdm.export(&vdm_path);
+
+    return json!({
+      "complete": false,
+      "next_demo": demo_name
+    });
+  }
+
+  return json!({
+    "complete": true
+  });
+}
+
+pub fn get_next_demo(settings: &Value, demo_name: &str) -> Value {
   let output_folder = settings["output"]["folder"].as_str().unwrap();
   let tf_folder = settings["tf_folder"].as_str().unwrap();
 
@@ -405,25 +431,10 @@ pub fn get_next_demo(settings: &Value, demo_name: &str) -> Value {
 
       let props = vdm.first().props();
 
+      let vdm_path = format!("{}\\{}.vdm", tf_folder, demo_name);
+      
       if props.commands.contains("quit;") {
-        if props.name.contains("mls_load_vdm") {
-          let new_vdm = props.name.replace("mls_load_vdm ", "");
-
-          let new_vdm_path = format!("{}\\{}.vdm", tf_folder, new_vdm);
-
-          let new_vdm = VDM::open(&new_vdm_path).unwrap();
-
-          new_vdm.export(&format!("{}\\{}.vdm", tf_folder, demo_name));
-
-          return json!({
-            "complete": false,
-            "next_demo": demo_name
-          });
-        }
-
-        return json!({
-          "complete": true
-        });
+        return handle_load_vdm(props, tf_folder, &demo_name, &vdm_path);
       }
 
       return json!({
@@ -485,24 +496,7 @@ pub fn get_next_demo(settings: &Value, demo_name: &str) -> Value {
         }
 
         if props.commands.contains("quit;") {
-          if props.name.contains("mls_load_vdm") {
-            let new_vdm = props.name.replace("mls_load_vdm ", "");
-
-            let new_vdm_path = format!("{}\\{}.vdm", tf_folder, new_vdm);
-
-            let new_vdm = VDM::open(&new_vdm_path).unwrap();
-
-            new_vdm.export(&vdm_path);
-
-            return json!({
-              "complete": false,
-              "next_demo": demo_name
-            });
-          }
-
-          return json!({
-            "complete": true
-          });
+          return handle_load_vdm(props.clone(), tf_folder, &demo_name, &vdm_path);
         }
       }
       _ => {}
@@ -533,33 +527,26 @@ pub fn get_next_demo(settings: &Value, demo_name: &str) -> Value {
     vdm::action::Action::PlayCommands(props) => {
       if props.commands.contains("playdemo") {
         let commands = props.commands.as_str();
-        let playdemo = commands.replace("playdemo ", "");
+        let playdemo = commands.replace("playdemo ", "").replace(";", "");
+
+        let new_vdm_path = format!("{}\\{}.vdm", tf_folder, playdemo);
+
+        let new_vdm = VDM::open(&new_vdm_path).unwrap();
+
+        let new_vdm_props = new_vdm.first().props();
+
+        if new_vdm_props.commands.contains("quit;") {
+          return handle_load_vdm(new_vdm_props, tf_folder, &playdemo, &new_vdm_path);
+        }
 
         return json!({
           "complete": false,
-          "next_demo": &playdemo.replace(";", "")
+          "next_demo": &playdemo
         });
       }
 
       if props.commands.contains("quit;") {
-        if props.name.contains("mls_load_vdm") {
-          let new_vdm = props.name.replace("mls_load_vdm ", "");
-
-          let new_vdm_path = format!("{}\\{}.vdm", tf_folder, new_vdm);
-
-          let new_vdm = VDM::open(&new_vdm_path).unwrap();
-
-          new_vdm.export(&vdm_path);
-
-          return json!({
-            "complete": false,
-            "next_demo": demo_name
-          });
-        }
-
-        return json!({
-          "complete": true
-        });
+        return handle_load_vdm(props.to_owned(), tf_folder, &demo_name, &vdm_path);
       }
 
       return json!({
