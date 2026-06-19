@@ -2,7 +2,7 @@ use serde::Serialize;
 use serde_json::{ json, Map, Value };
 use std::{ env, fs::{ self, File }, path::Path };
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, PartialEq, Eq)]
 pub enum RecordToggle {
   // * 0 = off, 1 = on critical hit, 2 = weapon dependant, 3 = ranged only,  4 = melee only, 5 = always
   Never,
@@ -14,6 +14,19 @@ pub enum RecordToggle {
   // MeleeOnly,
   Always,
   Passive,
+}
+
+impl RecordToggle {
+  pub fn from_str(val: &str) -> RecordToggle {
+    match val {
+      "Never" => RecordToggle::Never,
+      "CriticalHit" => RecordToggle::CriticalHit,
+      "AnyCritHit" => RecordToggle::AnyCritHit,
+      "Always" => RecordToggle::Always,
+      "Passive" => RecordToggle::Passive,
+      _ => RecordToggle::Never,
+    }
+  }
 }
 
 pub(crate) fn build_settings() -> Value {

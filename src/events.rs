@@ -10,6 +10,13 @@ use crate::{
   settings::load_settings,
   util::find_dir,
 };
+pub fn save_raw_events(new_events: Vec<Event>) -> Value {
+  for event in new_events.clone() {
+    println!("event: {:#?}", event);
+  }
+
+  json!(new_events)
+}
 
 pub fn save_events(new_events: Value) -> Value {
   let new_events = new_events.as_array().unwrap();
@@ -43,7 +50,7 @@ pub fn save_events(new_events: Value) -> Value {
 
       let is_killstreak = match &original_event.value {
         Bookmark(_) => true,
-        Killstreak(_) => false
+        Killstreak(_) => false,
       };
 
       if
@@ -60,9 +67,7 @@ pub fn save_events(new_events: Value) -> Value {
 
       match &original_event.value {
         Bookmark(bm) => {
-          if
-            bm.to_owned() != event["value"]["Bookmark"].as_str().unwrap()
-          {
+          if bm.to_owned() != event["value"]["Bookmark"].as_str().unwrap() {
             let built_event = build_event_from_json(event);
             extend!(new_events_text, "{}\n", built_event.event.trim());
             events.push(built_event);
@@ -70,9 +75,7 @@ pub fn save_events(new_events: Value) -> Value {
           }
         }
         Killstreak(ks) => {
-          if
-            ks.to_owned() != event["value"]["Killstreak"].as_i64().unwrap()
-          {
+          if ks.to_owned() != event["value"]["Killstreak"].as_i64().unwrap() {
             let built_event = build_event_from_json(event);
             extend!(new_events_text, "{}\n", built_event.event.trim());
             events.push(built_event);

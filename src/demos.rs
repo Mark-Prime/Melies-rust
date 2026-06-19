@@ -34,7 +34,7 @@ enum Event {
   Assist(Death),
   RoundEnd(u32),
   Uber(UberPointer),
-  Capture(CapturePointer)
+  Capture(CapturePointer),
 }
 
 impl Event {
@@ -262,7 +262,7 @@ pub(crate) fn load_demo(settings: &Value, demo_name: &String) -> Value {
 
   let demo = Demo::new(&file_buf);
 
-  match get_demo_header(demo) {
+  match get_demo_header(demo, &demo_name) {
     Ok(val) => {
       file["header"] = val;
     }
@@ -284,14 +284,16 @@ pub(crate) fn load_demo(settings: &Value, demo_name: &String) -> Value {
   file
 }
 
-fn get_demo_header(demo: Demo) -> Result<Value, std::io::Error> {
+fn get_demo_header(demo: Demo, demo_name: &String) -> Result<Value, std::io::Error> {
   let mut stream = demo.get_stream();
 
   let header = Header::read(&mut stream);
 
   match header {
     Ok(val) => {
-      return Ok(json!(val));
+      let mut new_header = json!(val);
+      new_header["demo_name"] = serde_json::Value::String(demo_name.to_owned());
+      return Ok(new_header);
     }
     Err(err) => {
       return Err(std::io::Error::new(std::io::ErrorKind::Other, format!("{}", err)));
@@ -316,7 +318,7 @@ fn scan_folder_for_filetype(settings: &Value, path: &str, file_type: &str) -> Ve
 
       let mut file = Value::from({});
       let metadata = fs::metadata(path.as_ref().unwrap().path()).unwrap();
-      file["name"] = Value::from(parsed_file_name);
+      file["name"] = Value::from(parsed_file_name.clone());
       file["metadata"] =
         json!({
           "modified": metadata.modified().unwrap(),
@@ -324,6 +326,7 @@ fn scan_folder_for_filetype(settings: &Value, path: &str, file_type: &str) -> Ve
         });
 
       if file_type == ".dem" {
+        let demo_name = parsed_file_name.replace(".dem", "");
         let mut vdm_path = path.as_ref().unwrap().path();
         let demo_path = path.as_ref().unwrap().path();
         let mut demo_file = File::open(path.unwrap().path()).unwrap();
@@ -336,7 +339,7 @@ fn scan_folder_for_filetype(settings: &Value, path: &str, file_type: &str) -> Ve
 
         file["hasVdm"] = serde_json::Value::Bool(vdm_path.exists());
 
-        match get_demo_header(demo) {
+        match get_demo_header(demo, &demo_name) {
           Ok(val) => {
             file["header"] = val;
           }
@@ -412,10 +415,15 @@ fn get_player_class(
 }
 
 pub fn scan_demo(settings: Value, path: String) -> Value {
-  let mut file_path = path.clone();
+  let file_path;
+  let demo_name;
 
   if path.starts_with("\\") {
     file_path = format!("{}{}", settings["tf_folder"].as_str().unwrap(), path);
+    demo_name = path.clone().replace("\\", "").replace(".dem", "");
+  } else {
+    demo_name = path.clone().replace(".dem", "");
+    file_path = format!("{}\\{}", settings["tf_folder"].as_str().unwrap(), path);
   }
 
   let file = fs::read(file_path).unwrap();
@@ -448,7 +456,6 @@ pub fn scan_demo(settings: Value, path: String) -> Value {
 
   organizer::get_captures(&mut state, &mut user_events);
 
-
   let sorted_events: Arc<Mutex<HashMap<u16, Vec<Event>>>> = Arc::new(Mutex::new(HashMap::new()));
   let player_lives: Arc<Mutex<HashMap<u16, Vec<Life>>>> = Arc::new(Mutex::new(HashMap::new()));
   let killstreak_pointers: Arc<Mutex<Vec<KillstreakPointer>>> = Arc::new(Mutex::new(vec![]));
@@ -461,7 +468,6 @@ pub fn scan_demo(settings: Value, path: String) -> Value {
   let user_events_buffer = user_events;
 
   for (key, events) in user_events_buffer {
-
     let sorted_events = Arc::clone(&sorted_events);
     let player_lives = Arc::clone(&player_lives);
     let killstreak_pointers = Arc::clone(&killstreak_pointers);
@@ -482,123 +488,123 @@ pub fn scan_demo(settings: Value, path: String) -> Value {
 
       for event in &events {
         match event {
-            Event::Spawn(spawn) => {
-                if current_life.start == None || current_life.classes.len() == 0 {
-                  current_life = Life::new(Some(spawn.tick.into()), vec![spawn.class.to_string()]);
+          Event::Spawn(spawn) => {
+            if current_life.start == None || current_life.classes.len() == 0 {
+              current_life = Life::new(Some(spawn.tick.into()), vec![spawn.class.to_string()]);
+              continue;
+            }
+
+            if !current_life.classes.contains(&spawn.class.to_string()) {
+              current_life.classes.push(spawn.class.to_string());
+            }
+          }
+          Event::Kill(kill) => {
+            if kill.killer == kill.victim {
+              continue;
+            }
+
+            if current_life.start == None || current_life.classes.len() == 0 {
+              current_life = match current_player.pop() {
+                Some(val) => val,
+                None => {
                   continue;
                 }
-    
-                if !current_life.classes.contains(&spawn.class.to_string()) {
-                  current_life.classes.push(spawn.class.to_string());
-                }
-              }
-            Event::Kill(kill) => {
-                if kill.killer == kill.victim {
+              };
+            }
+
+            // println!("{:?}", kill);
+            if kill.victim_class == Class::Medic {
+              let med_pick = KillPointer::new(key, current_player.len(), current_life.kills.len());
+              current_life.med_picks.push(med_pick.clone());
+              med_picks.lock().unwrap().push(med_pick);
+            }
+
+            if kill.is_airborne {
+              let airshot = KillPointer::new(key, current_player.len(), current_life.kills.len());
+              current_life.airshots.push(airshot.clone());
+              airshots.lock().unwrap().push(airshot);
+            }
+
+            current_life.last_kill_tick = kill.tick;
+
+            current_life.kills.push(kill.to_owned());
+          }
+          Event::Assist(assist) => {
+            if current_life.start == None || current_life.classes.len() == 0 {
+              current_life = match current_player.pop() {
+                Some(val) => val,
+                None => {
                   continue;
                 }
+              };
+            }
 
-                if current_life.start == None || current_life.classes.len() == 0 {
-                  current_life = match current_player.pop() {
-                    Some(val) => val,
-                    None => {
-                      continue;
-                    }
-                  };
+            current_life.assists.push(assist.to_owned());
+          }
+          Event::Death(death) => {
+            // if death.killer == 0 {
+            //   continue;
+            // }
+
+            if current_life.start == None || current_life.classes.len() == 0 {
+              current_life = match current_player.pop() {
+                Some(val) => val,
+                None => {
+                  continue;
                 }
+              };
+            }
 
-                // println!("{:?}", kill);
-                if kill.victim_class == Class::Medic {
-                  let med_pick = KillPointer::new(key, current_player.len(), current_life.kills.len());
-                  current_life.med_picks.push(med_pick.clone());
-                  med_picks.lock().unwrap().push(med_pick);
+            current_life.end = Some(death.tick.into());
+
+            if !current_life.classes.contains(&"spy".to_string()) && current_life.classes.len() > 0 {
+              current_life.finalized = true;
+            }
+
+            current_player.push(current_life);
+
+            current_life = Life::new(None, vec!["".to_string()]);
+          }
+          Event::RoundEnd(tick) => {
+            if current_life.start == None || current_life.classes.len() == 0 {
+              current_life = match current_player.pop() {
+                Some(val) => val,
+                None => {
+                  continue;
                 }
+              };
+            }
 
-                if kill.is_airborne {
-                  let airshot = KillPointer::new(key, current_player.len(), current_life.kills.len());
-                  current_life.airshots.push(airshot.clone());
-                  airshots.lock().unwrap().push(airshot);
+            current_life.end = Some(tick.to_owned());
+            current_life.finalized = true;
+            current_player.push(current_life);
+
+            current_life = Life::new(None, vec!["".to_string()]);
+          }
+          Event::Uber(uber_pointer) => {
+            if current_life.start == None || current_life.classes.len() == 0 {
+              current_life = match current_player.pop() {
+                Some(val) => val,
+                None => {
+                  continue;
                 }
+              };
+            }
 
-                current_life.last_kill_tick = kill.tick;
-
-                current_life.kills.push(kill.to_owned());
-              }
-            Event::Assist(assist) => {
-                if current_life.start == None || current_life.classes.len() == 0 {
-                  current_life = match current_player.pop() {
-                    Some(val) => val,
-                    None => {
-                      continue;
-                    }
-                  };
+            current_life.ubers.push(uber_pointer.to_owned());
+          }
+          Event::Capture(capture_pointer) => {
+            if current_life.start == None || current_life.classes.len() == 0 {
+              current_life = match current_player.pop() {
+                Some(val) => val,
+                None => {
+                  continue;
                 }
+              };
+            }
 
-                current_life.assists.push(assist.to_owned());
-              }
-            Event::Death(death) => {
-                // if death.killer == 0 {
-                //   continue;
-                // }
-
-                if current_life.start == None || current_life.classes.len() == 0 {
-                  current_life = match current_player.pop() {
-                    Some(val) => val,
-                    None => {
-                      continue;
-                    }
-                  };
-                }
-
-                current_life.end = Some(death.tick.into());
-
-                if !current_life.classes.contains(&"spy".to_string()) && current_life.classes.len() > 0 {
-                  current_life.finalized = true;
-                }
-
-                current_player.push(current_life);
-
-                current_life = Life::new(None, vec!["".to_string()]);
-              }
-            Event::RoundEnd(tick) => {
-                if current_life.start == None || current_life.classes.len() == 0 {
-                  current_life = match current_player.pop() {
-                    Some(val) => val,
-                    None => {
-                      continue;
-                    }
-                  };
-                }
-
-                current_life.end = Some(tick.to_owned());
-                current_life.finalized = true;
-                current_player.push(current_life);
-
-                current_life = Life::new(None, vec!["".to_string()]);
-              }
-            Event::Uber(uber_pointer) => {
-              if current_life.start == None || current_life.classes.len() == 0 {
-                current_life = match current_player.pop() {
-                  Some(val) => val,
-                  None => {
-                    continue;
-                  }
-                };
-              }
-
-              current_life.ubers.push(uber_pointer.to_owned());
-            },
-            Event::Capture(capture_pointer) => {
-              if current_life.start == None || current_life.classes.len() == 0 {
-                current_life = match current_player.pop() {
-                  Some(val) => val,
-                  None => {
-                    continue;
-                  }
-                };
-              }
-
-              current_life.captures.push(capture_pointer.to_owned());
-            },
+            current_life.captures.push(capture_pointer.to_owned());
+          }
         }
       }
 
@@ -628,7 +634,8 @@ pub fn scan_demo(settings: Value, path: String) -> Value {
             streak_count += 1;
           } else if
             (kill_tick as i64) <
-            last_kill_tick + settings.lock().unwrap()["recording"]["before_killstreak_per_kill"].as_i64().unwrap()
+            last_kill_tick +
+              settings.lock().unwrap()["recording"]["before_killstreak_per_kill"].as_i64().unwrap()
           {
             life.killstreak_pointers[streak_count - 1].kills.push(kill_index);
             kill_count += 1;
@@ -648,7 +655,10 @@ pub fn scan_demo(settings: Value, path: String) -> Value {
           .iter()
           .map(|v| v.clone())
           .filter(|sen| {
-            let min_kills = settings.lock().unwrap()["recording"]["minimum_kills_in_streak"].as_i64();
+            let min_kills = settings
+              .lock()
+              .unwrap()["recording"]["minimum_kills_in_streak"]
+              .as_i64();
 
             match min_kills {
               Some(min_kills) => sen.kills.len() >= (min_kills as usize),
@@ -659,6 +669,9 @@ pub fn scan_demo(settings: Value, path: String) -> Value {
 
         for ks in &life.killstreak_pointers {
           killstreak_pointers.lock().unwrap().push(ks.clone());
+          for kill_index in &ks.kills {
+            life.kills[*kill_index].is_killstreak = true;
+          }
         }
       }
 
@@ -669,7 +682,9 @@ pub fn scan_demo(settings: Value, path: String) -> Value {
     handles.push(handle);
   }
 
-  for handle in handles { handle.join().unwrap(); }
+  for handle in handles {
+    handle.join().unwrap();
+  }
 
   let killstreak_pointers = &mut *killstreak_pointers.lock().unwrap();
 
@@ -693,6 +708,7 @@ pub fn scan_demo(settings: Value, path: String) -> Value {
         "ticks": ticks,
         "frames": header.frames,
         "signon": header.signon,
+        "demo_name": demo_name
       },
       "data": {
         "deaths": state.deaths,
@@ -753,16 +769,16 @@ pub fn cleanup_renamed_events(demo_map: Value, events: Vec<Value>) -> Value {
   json!(demos)
 }
 
-fn get_demo_res(demo: &str) -> Value {
+pub fn get_demo_res(demo: &str) -> Value {
   let file_path = format!("{}", demo);
-  
+
   let settings = settings::load_settings();
 
   scan_demo(settings, file_path)
 }
 
 fn output_info(info: Value, output: &str) -> Value {
-  if output == "" { 
+  if output == "" {
     println!("{}", serde_json::to_string_pretty(&info).unwrap());
     return Value::from(info);
   }
@@ -777,8 +793,9 @@ fn output_info(info: Value, output: &str) -> Value {
 
 pub fn get_info(demo: &str, output: &str) -> Value {
   let res = get_demo_res(demo);
-  
-  let new_res = json!({
+
+  let new_res =
+    json!({
     "header": res["header"],
     "data": {
       "players": res["data"]["users"],
@@ -792,7 +809,7 @@ pub fn get_info(demo: &str, output: &str) -> Value {
 
 pub fn get_players(demo: &str, output: &str) -> Value {
   let res = get_demo_res(demo);
-  
+
   let new_res = json!({
     "header": res["header"],
     "data": res["data"]["users"]
@@ -803,11 +820,41 @@ pub fn get_players(demo: &str, output: &str) -> Value {
 
 pub fn get_chat(demo: &str, output: &str) -> Value {
   let res = get_demo_res(demo);
-  
+
   let new_res = json!({
     "header": res["header"],
     "data": res["data"]["chat"]
   });
 
   output_info(new_res, output)
+}
+
+pub fn tf2_class_converter(player_class: String) -> String {
+  match player_class.as_str() {
+    "1" => "scout".to_string(),
+    "3" => "soldier".to_string(),
+    "7" => "pyro".to_string(),
+    "4" => "demoman".to_string(),
+    "6" => "heavy".to_string(),
+    "9" => "engineer".to_string(),
+    "5" => "medic".to_string(),
+    "2" => "sniper".to_string(),
+    "8" => "spy".to_string(),
+    _ => player_class,
+  }
+}
+
+pub fn tf2_class_num_converter(player_class: String) -> i32 {
+  match player_class.as_str() {
+    "1" => 1,
+    "3" => 2,
+    "7" => 3,
+    "4" => 4,
+    "6" => 5,
+    "9" => 6,
+    "5" => 7,
+    "2" => 8,
+    "8" => 9,
+    _ => player_class.parse().unwrap(),
+  }
 }

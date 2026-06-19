@@ -15,6 +15,7 @@ use crate::vdms::*;
 use crate::util::*;
 
 pub mod addons;
+pub mod automation;
 pub mod clip;
 pub mod demos;
 pub mod event;

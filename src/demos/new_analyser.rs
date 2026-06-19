@@ -5,7 +5,7 @@ use tf_demo_parser::demo::gameevent_gen::{
   PlayerDeathEvent,
   PlayerSpawnEvent,
   TeamPlayRoundWinEvent,
-  TeamPlayPointCapturedEvent
+  TeamPlayPointCapturedEvent,
 };
 use tf_demo_parser::demo::message::packetentities::{ EntityId, PacketEntitiesMessage };
 use tf_demo_parser::demo::message::usermessage::{ ChatMessageKind, SayText2Message, UserMessage };
@@ -55,42 +55,46 @@ impl ChatMessage {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "camelCase")]
-pub struct  Capture {
-    pub cp: u8,
-    pub cp_name: String,
-    pub team: Team,
-    pub cappers: vec::Vec<EntityId>,
-    pub cappers_users: vec::Vec<UserId>,
-    pub tick: DemoTick
+pub struct Capture {
+  pub cp: u8,
+  pub cp_name: String,
+  pub team: Team,
+  pub cappers: vec::Vec<EntityId>,
+  pub cappers_users: vec::Vec<UserId>,
+  pub tick: DemoTick,
 }
 
 impl Capture {
-    pub fn from_event(event: &TeamPlayPointCapturedEvent, tick: DemoTick, state: &MatchState) -> Self {
-      let mut cappers = vec::Vec::new();
-      let mut cappers_users = vec::Vec::new();
-      let cappers_text = event.cappers.to_string(); //"\u{2}\u{5}\u{f}"
-      let cappers_split = cappers_text.chars().collect::<Vec<char>>();
+  pub fn from_event(
+    event: &TeamPlayPointCapturedEvent,
+    tick: DemoTick,
+    state: &MatchState
+  ) -> Self {
+    let mut cappers = vec::Vec::new();
+    let mut cappers_users = vec::Vec::new();
+    let cappers_text = event.cappers.to_string(); //"\u{2}\u{5}\u{f}"
+    let cappers_split = cappers_text.chars().collect::<Vec<char>>();
 
-      for i in 0..cappers_split.len() {
-        if ['\r', '\n', '\t', ' '].contains(&cappers_split[i]) {
-          continue;
-        }
-
-        let cap_u32 = cappers_split[i] as u32;
-
-        cappers.push(EntityId::from(cap_u32));
-        cappers_users.push(state.id_map.get(&EntityId::from(cap_u32)).unwrap().to_owned().into());
+    for i in 0..cappers_split.len() {
+      if ['\r', '\n', '\t', ' '].contains(&cappers_split[i]) {
+        continue;
       }
 
-      Capture {
-        cp: event.cp,
-        cp_name: event.cp_name.to_string(),
-        team: Team::new(event.team),
-        cappers,
-        cappers_users,
-        tick
-      }
+      let cap_u32 = cappers_split[i] as u32;
+
+      cappers.push(EntityId::from(cap_u32));
+      cappers_users.push(state.id_map.get(&EntityId::from(cap_u32)).unwrap().to_owned().into());
     }
+
+    Capture {
+      cp: event.cp,
+      cp_name: event.cp_name.to_string(),
+      team: Team::new(event.team),
+      cappers,
+      cappers_users,
+      tick,
+    }
+  }
 }
 
 #[derive(
@@ -316,6 +320,7 @@ pub struct Death {
   pub killer_class: Class,
   pub victim_class: Class,
   pub is_airborne: bool,
+  pub is_killstreak: bool,
 }
 
 impl Death {
@@ -341,6 +346,7 @@ impl Death {
       killer_class: Class::Other,
       victim_class: Class::Other,
       is_airborne,
+      is_killstreak: false,
     }
   }
 }
