@@ -12,7 +12,10 @@ use crate::{
 };
 pub fn save_raw_events(new_events: Vec<Event>) -> Value {
   for event in new_events.clone() {
-    println!("event: {:#?}", event);
+    match event.value {
+      Bookmark(val) => println!("[auto] {} (\"{}\" at {}) {}", val, event.demo_name, event.tick, event.notes),
+      Killstreak(val) => println!("[auto] killstreak {} (\"{}\" at {}) {}", val, event.demo_name, event.tick, event.notes),
+    }
   }
 
   json!(new_events)

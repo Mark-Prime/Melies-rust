@@ -58,6 +58,10 @@ fn player_highlights(
 
   let mut events = vec![];
 
+  if lives.is_null() {
+    return events;
+  }
+
   for life in lives.as_array().unwrap() {
     let record_whole_life =
       ((life["med_picks"].as_array().unwrap().len() > 0 &&
@@ -155,7 +159,7 @@ fn player_highlights(
         event: "".to_string(),
         demo_name: demo_name.clone(),
         tick: kill["tick"].as_i64().unwrap(),
-        value: Bookmark(bookmark_label),
+        value: Bookmark(format!("{} spec {}", bookmark_label, user["steamId64"].as_str().unwrap())),
         notes: format!(
           "{} - {}",
           user["name"].as_str().unwrap(),
@@ -222,27 +226,27 @@ fn set_demo_names(events_list: &mut Vec<Vec<Event>>, demo_name: String) -> Vec<V
       event: "".to_string(),
       demo_name: demo_name.clone(),
       tick: settings["recording"]["start_delay"].as_i64().unwrap(),
-      value: Bookmark(format!("mls_load_vdm {}~1", demo_name)),
+      value: Bookmark(format!("mls_load_vdm {}~0", demo_name)),
       notes: "".to_string(),
     }]
   ];
 
   for (index, events) in &mut events_list.iter_mut().enumerate() {
     for event in events.iter_mut() {
-      event.demo_name = format!("{}~{}", demo_name, index + 1);
+      event.demo_name = format!("{}~{}", demo_name, index);
     }
 
-    if index < events.len() - 1 {
+    if index < events.len() - 2 {
       let last_event = events[events.len() - 1].clone();
 
-      new_events_list.push(
-        vec![Event {
+      events.push(
+        Event {
           event: "".to_string(),
-          demo_name: format!("{}~{}", demo_name, index + 1),
+          demo_name: format!("{}~{}", demo_name, index),
           tick: last_event.tick + settings["recording"]["start_delay"].as_i64().unwrap(),
-          value: Bookmark(format!("mls_load_vdm {}~{}", demo_name, index + 2)),
+          value: Bookmark(format!("mls_load_vdm {}~{}", demo_name, index + 1)),
           notes: "".to_string(),
-        }]
+        }
       );
     }
 
@@ -295,6 +299,10 @@ fn player_lives(
 ) -> Vec<Event> {
   let mut events: Vec<Event> = vec![];
 
+  if lives.is_null() {
+    return events;
+  }
+
   for life in lives.as_array().unwrap() {
     if
       life["kills"].as_array().unwrap().len() > 0 ||
@@ -339,12 +347,12 @@ pub fn life_to_bookmarks(demo_name: String, user: Value, life: Value) -> Vec<Eve
 // Record the POV of all players
 pub fn all_pov_from_res(res: Value) -> Vec<Event> {
   let mut events: Vec<Event> = vec![];
-  let players = res["data"]["users"].as_array().unwrap();
+  let users = res["data"]["users"].as_object().unwrap();
   let demo_name = res["header"]["demo_name"].as_str().unwrap().to_string();
 
-  for player in players {
-    let steam_id = player["steamId64"].as_str().unwrap().to_string();
-    let player_classes = player["classes"].as_object().unwrap().keys().collect::<Vec<_>>();
+  for user in users {
+    let steam_id = user.1["steamId64"].as_str().unwrap().to_string();
+    let player_classes = user.1["classes"].as_object().unwrap().keys().collect::<Vec<_>>();
 
     if player_classes.len() < 1 {
       continue;
@@ -355,7 +363,7 @@ pub fn all_pov_from_res(res: Value) -> Vec<Event> {
     let mut event = player_pov(demo_name.clone(), steam_id.clone());
     event.notes = format!(
       "{} - {} - Full POV",
-      player["name"].as_str().unwrap(),
+      user.1["name"].as_str().unwrap(),
       player_class_string
     );
 
