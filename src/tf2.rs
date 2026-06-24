@@ -22,6 +22,7 @@ fn use_64bit(settings: &Value, tab: i64) -> bool {
 
   return use_64bit;
 }
+
 fn inject_hlae(settings: &Value, tab: i64) -> bool {
   let mut inject_hlae = settings["hlae"]["inject_hlae"].as_bool().unwrap();
 
@@ -143,7 +144,7 @@ pub fn run_tf2(
 
   let launch_options = build_launch_options(settings, demo_name, tab);
 
-  println!("Launch options: {}", launch_options);
+  // println!("Launch options: {}", launch_options);
   
   let tf2_path = get_tf2_path(settings, tab);
 
@@ -182,8 +183,8 @@ pub fn run_tf2(
         hlae_dll = hlae_dll.replace("AfxHookSource.dll", "x64\\AfxHookSource.dll");
       }
 
-      println!("HLAE path: {}", hlae_dll);
-      println!("inject_hlae: {}", inject_hlae);
+      // println!("HLAE path: {}", hlae_dll);
+      // println!("inject_hlae: {}", inject_hlae);
 
       if inject_hlae && Path::new(&hlae_dll).exists() {
         args.push("-hookDllPath");
@@ -202,7 +203,7 @@ pub fn run_tf2(
         args.push(dll);
       }
 
-      println!("Args: {:#?}", args);
+      // println!("Args: {:#?}", args);
 
       let hlae_cmd = Command::new(hlae).args(args).spawn();
 

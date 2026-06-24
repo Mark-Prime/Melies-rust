@@ -1,5 +1,5 @@
-use std::fs;
-
+use std::fs::{File};
+use std::io::Write;
 use chrono::{ DateTime, Local };
 use regex::Regex;
 use serde_json::{ Value, json };
@@ -10,27 +10,12 @@ use crate::{
   settings::load_settings,
   util::find_dir,
 };
-pub fn save_raw_events(new_events: Vec<Event>) -> Value {
-  for event in new_events.clone() {
-    match event.value {
-      Bookmark(val) => println!("[auto] {} (\"{}\" at {}) {}", val, event.demo_name, event.tick, event.notes),
-      Killstreak(val) => println!("[auto] killstreak {} (\"{}\" at {}) {}", val, event.demo_name, event.tick, event.notes),
-    }
-  }
-
-  json!(new_events)
-}
 
 pub fn save_events(new_events: Value) -> Value {
   let new_events = new_events.as_array().unwrap();
   let mut events: Vec<Event> = vec![];
-  let mut new_events_text = String::new();
-
-  // println!("New Events: {:#?}", new_events);
 
   for demo in new_events {
-    // println!("demo: {:#?}", demo);
-    extend!(new_events_text, "{}\n", ">");
 
     for event in demo.as_array().unwrap() {
       let re = Regex::new("\\[(.*)\\] (.*) \\(\"(.*)\" at (\\d*)\\)(.*)").unwrap();
@@ -38,8 +23,6 @@ pub fn save_events(new_events: Value) -> Value {
       if event["event"].as_str().is_none() {
         continue;
       }
-
-      // println!("event: {:#?}", event);
 
       let events_regex = match re.captures(event["event"].as_str().unwrap()) {
         Some(val) => val,
@@ -63,7 +46,6 @@ pub fn save_events(new_events: Value) -> Value {
         event["isKillstreak"].as_bool().unwrap() != is_killstreak
       {
         let built_event = build_event_from_json(event);
-        extend!(new_events_text, "{}\n", built_event.event.trim());
         events.push(built_event);
         continue;
       }
@@ -72,7 +54,6 @@ pub fn save_events(new_events: Value) -> Value {
         Bookmark(bm) => {
           if bm.to_owned() != event["value"]["Bookmark"].as_str().unwrap() {
             let built_event = build_event_from_json(event);
-            extend!(new_events_text, "{}\n", built_event.event.trim());
             events.push(built_event);
             continue;
           }
@@ -80,19 +61,38 @@ pub fn save_events(new_events: Value) -> Value {
         Killstreak(ks) => {
           if ks.to_owned() != event["value"]["Killstreak"].as_i64().unwrap() {
             let built_event = build_event_from_json(event);
-            extend!(new_events_text, "{}\n", built_event.event.trim());
             events.push(built_event);
             continue;
           }
         }
       }
 
-      extend!(new_events_text, "{}\n", original_event.event.trim());
       events.push(original_event);
     }
   }
 
-  // println!("{:#?}", new_events_text);
+  write_events(events, false)
+}
+
+pub fn write_events(events: Vec<Event>, append: bool) -> Value {
+  let mut new_events_text = String::new();
+
+  let mut current_demo = "".to_string();
+
+  for event in events.clone() {
+    if event.demo_name != current_demo {
+      extend!(new_events_text, "{}\n", ">");
+      let demo_name = event.demo_name.clone();
+      current_demo = demo_name;
+    } else {
+      extend!(new_events_text, "{}", "\n");
+    }
+
+    extend!(new_events_text, "{}", match event.value {
+      Bookmark(val) => format!("[melies] {} (\"{}\" at {}) {}", val, event.demo_name, event.tick, event.notes),
+      Killstreak(val) => format!("[melies] killstreak {} (\"{}\" at {}) {}", val, event.demo_name, event.tick, event.notes),
+    });
+  }
 
   let settings = load_settings();
 
@@ -110,12 +110,16 @@ pub fn save_events(new_events: Value) -> Value {
     }
   }
 
-  fs::write(dir, new_events_text).unwrap();
+  let mut file = File::options().write(true).append(append).open(dir).unwrap();
+
+  if let Err(e) = writeln!(&mut file, "{new_events_text}") {
+      eprintln!("Couldn't write to file: {}", e);
+  }
 
   return json!({
-      "code": 200,
-      "events": events
-    });
+    "code": 200,
+    "events": events
+  });
 }
 
 fn build_event_from_json(event_json: &Value) -> Event {

@@ -129,7 +129,7 @@ pub fn run_ryukbot() -> Value {
     if event.contains(&"mls_rec_demo") {
       let demo = load_demo(&settings, &event.demo_name);
 
-      println!("{}", demo);
+      // println!("{}", demo);
 
       if !demo["loaded"].as_bool().unwrap() {
         continue;
@@ -352,7 +352,7 @@ fn add_command_to_vdm(vdm: &mut VDM, command: &Command) {
 }
 
 fn add_clip_to_vdm(vdm: &mut VDM, clip: &Clip, settings: &Value) {
-  println!("add_clip_to_vdm: {:?}", vdm);
+  // println!("add_clip_to_vdm: {:?}", vdm);
 
   let last_tick = match vdm.last().props().start_tick {
     Some(action) => action,

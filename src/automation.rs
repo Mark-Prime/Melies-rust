@@ -213,11 +213,13 @@ pub fn all_lives_from_res(res: Value, include_empty_lives: bool) -> Vec<Vec<Even
 }
 
 fn set_demo_names(events_list: &mut Vec<Vec<Event>>, demo_name: String) -> Vec<Vec<Event>> {
+  let events_length = events_list.len();
+
   if [0, 1].contains(&events_list.len()) {
     return events_list.to_vec();
   }
 
-  events_list.sort_by(|a, b| a.len().cmp(&b.len()));
+  events_list.sort_by(|a, b| b.len().cmp(&a.len()));
 
   let settings = crate::settings::load_settings();
 
@@ -236,7 +238,7 @@ fn set_demo_names(events_list: &mut Vec<Vec<Event>>, demo_name: String) -> Vec<V
       event.demo_name = format!("{}~{}", demo_name, index);
     }
 
-    if index < events.len() - 2 {
+    if index < events_length - 1 {
       let last_event = events[events.len() - 1].clone();
 
       events.push(
