@@ -296,11 +296,18 @@ fn get_player_info_from_steam_id(
 
   for life in user_lives.as_array().unwrap() {
     let start = life["start"].as_i64().unwrap() as u32;
+
+    let mut add_life = true;
     
     for pregame_tick in &pregame_ticks {
       if pregame_tick.contains(&start) {
-        continue;
+        add_life = false;
+        break;
       }
+    }
+
+    if !add_life {
+      continue;
     }
 
     valid_lives.push(life.clone());
