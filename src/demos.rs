@@ -149,6 +149,7 @@ struct Life {
   pub ubers: Vec<UberPointer>,
   pub captures: Vec<CapturePointer>,
   pub finalized: bool,
+  pub is_pregame: bool,
 }
 
 impl Life {
@@ -166,6 +167,7 @@ impl Life {
       ubers: vec![],
       captures: vec![],
       finalized: false,
+      is_pregame: false,
     }
   }
 }

@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use serde_json::{ Map, Value };
 use crate::event::{ Event, EventStyle::Bookmark };
 use crate::demos::tf2_class_converter;
@@ -28,13 +30,13 @@ pub fn all_highlights_from_res(res: Value) -> Vec<Vec<Event>> {
 }
 
 // Record all highlights
-pub fn player_highlights_from_res(res: Value, steam_id: String) -> Vec<Event> {
+pub fn player_highlights_from_res(res: Value, steam_id: String, skip_pregame: bool) -> Vec<Event> {
   let binding = res.clone();
   let users = binding["data"]["users"].as_object().unwrap();
   let demo_name = res.clone()["header"]["demo_name"].as_str().unwrap().to_string();
   let settings = crate::settings::load_settings();
 
-  let (user_info, user_lives) = get_player_info_from_steam_id(res, users, steam_id);
+  let (user_info, user_lives) = get_player_info_from_steam_id(res, users, steam_id, skip_pregame);
 
   player_highlights(&demo_name, user_info, user_lives, &settings)
 }
@@ -261,7 +263,8 @@ fn set_demo_names(events_list: &mut Vec<Vec<Event>>, demo_name: String) -> Vec<V
 fn get_player_info_from_steam_id(
   res: Value,
   users: &Map<String, Value>,
-  steam_id: String
+  steam_id: String,
+  skip_pregame: bool
 ) -> (Value, Value) {
   let mut user_info = Value::Null;
   let mut user_lives = Value::Null;
@@ -275,20 +278,49 @@ fn get_player_info_from_steam_id(
     user_lives = res["data"]["player_lives"][user.0.to_string()].clone();
   }
 
-  (user_info, user_lives)
+  if !skip_pregame {
+    return (user_info, user_lives);
+  }
+
+  let mut valid_lives = vec![];
+
+  let mut pregame_ticks: Vec<Range<u32>> = vec![];
+
+  for round in res["data"]["rounds"].as_array().unwrap() {
+    if round.as_object().unwrap()["is_pregame"].as_bool().unwrap() {
+      pregame_ticks.push(
+        round["start_tick"].as_i64().unwrap() as u32..round["end_tick"].as_i64().unwrap() as u32
+      );
+    }
+  }
+
+  for life in user_lives.as_array().unwrap() {
+    let start = life["start"].as_i64().unwrap() as u32;
+    
+    for pregame_tick in &pregame_ticks {
+      if pregame_tick.contains(&start) {
+        continue;
+      }
+    }
+
+    valid_lives.push(life.clone());
+  }
+
+  (user_info, Value::Array(valid_lives))
 }
 
 // Record every life from a specific player but skip deaths
 pub fn player_lives_from_res(
   res: Value,
   steam_id: String,
-  include_empty_lives: bool
+  include_empty_lives: bool,
+  skip_pregame: bool
 ) -> Vec<Event> {
   let binding = res.clone();
   let users = binding["data"]["users"].as_object().unwrap();
   let demo_name = res.clone()["header"]["demo_name"].as_str().unwrap().to_string();
 
-  let (user_info, user_lives) = get_player_info_from_steam_id(res, users, steam_id);
+  let (user_info, user_lives) = get_player_info_from_steam_id(res, users, steam_id, skip_pregame);
 
   player_lives(demo_name.clone(), user_info.clone(), user_lives, include_empty_lives)
 }
